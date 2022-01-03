@@ -4,7 +4,7 @@ import coc
 import aiohttp
 import asyncio
 import traceback
-from creds import *
+from credentials import *
 from settings import *
 
 COC_CLIENT = coc.login(COC_API_EMAIL, COC_API_PASSWORD)
