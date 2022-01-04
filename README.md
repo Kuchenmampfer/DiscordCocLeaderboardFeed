@@ -23,12 +23,12 @@ it, but you have the total control of how it behaves.
 ## Features
 This script provides the following features:
 - daily leaderboard feed at a given time
-- leaderboard feed at every end of season (planned)
+- leaderboard feed at every end of season
 - leaderboards including all players in your clan[family]
 - leaderboards including a custom list of players (planned)
 - global/local leaderboards (planned)
 - custom formatting
-- home base leaderboards as well as builder base ones (planned)
+- home base leaderboards as well as builder base ones
 
 
 ## Example Screenshot

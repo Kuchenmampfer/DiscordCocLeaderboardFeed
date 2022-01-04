@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import discord
 import coc
@@ -10,7 +12,7 @@ from credentials import *
 COC_CLIENT = coc.login(COC_API_EMAIL, COC_API_PASSWORD)
 
 
-async def get_players(client: coc.Client) -> list[coc.ClanMember]:
+async def get_clan_players(client: coc.Client) -> list[coc.ClanMember]:
     players: list[coc.ClanMember] = []
     for tag in settings.CLAN_TAGS:
         clan = None
@@ -23,7 +25,14 @@ async def get_players(client: coc.Client) -> list[coc.ClanMember]:
         if clan:
             for member in clan.members:
                 players.append(member)
-    return sorted(players, key=lambda player: player.trophies, reverse=True)
+    return players
+
+
+def sort_players(players: list[coc.Player | coc.ClanMember | coc.RankedPlayer]):
+    if settings.VERSUS:
+        return sorted(players, key=lambda player: player.versus_trophies, reverse=True)
+    else:
+        return sorted(players, key=lambda player: player.trophies, reverse=True)
 
 
 async def get_leaderboard_str(leaderboard: list[coc.ClanMember]) -> str:
@@ -33,7 +42,7 @@ async def get_leaderboard_str(leaderboard: list[coc.ClanMember]) -> str:
 
 
 async def send_leaderboard(webhook: discord.Webhook, client: coc.Client):
-    l_board = await get_players(client)
+    l_board = await get_clan_players(client)
     l_board_str = await get_leaderboard_str(l_board[:settings.PLAYER_LIMIT])
     embed = discord.Embed(colour=settings.COLOUR, title=settings.LEADERBOARD_TITLE, description=l_board_str)
     if settings.TIMESTAMP:
@@ -41,8 +50,15 @@ async def send_leaderboard(webhook: discord.Webhook, client: coc.Client):
     await webhook.send(embed=embed)
 
 
-def calculate_remaining_time(last_invoke_date: datetime.date) -> datetime.timedelta:
-    next_invoke_date = last_invoke_date + datetime.timedelta(days=1)
+def calculate_remaining_time() -> datetime.timedelta:
+    if not settings.DAILY:  # this indicates that leaderboards shall only be send at the end of each season
+        return coc.utils.get_season_end() - datetime.datetime.utcnow()
+
+    # now for the daily scheduling:
+    if datetime.datetime.utcnow().time() > settings.INVOKE_TIME:
+        next_invoke_date = datetime.date.today() + datetime.timedelta(days=1)
+    else:
+        next_invoke_date = datetime.date.today()
     next_invoke_time = datetime.datetime(next_invoke_date.year, next_invoke_date.month,
                                          next_invoke_date.day, settings.INVOKE_TIME.hour, settings.INVOKE_TIME.minute)
     return next_invoke_time - datetime.datetime.utcnow()
@@ -53,25 +69,27 @@ async def main():
         adapter = discord.AsyncWebhookAdapter(session)
         webhook = discord.Webhook.from_url(DISCORD_WEBHOOK_URL, adapter=adapter)
         running = True
-
-        if datetime.datetime.utcnow().time() > settings.INVOKE_TIME:
-            last_invoke_day = datetime.date.today()
-        else:
-            last_invoke_day = datetime.date.today() - datetime.timedelta(days=1)
+        first_run = True
 
         while running:
             try:
-                sleep_time = calculate_remaining_time(last_invoke_day)
-                await asyncio.sleep(sleep_time.total_seconds())
+                sleep_time = calculate_remaining_time()
+                if TEST_MODE and first_run:
+                    first_run = False
+                    print(sleep_time)
+                else:
+                    first_run = False
+                    await asyncio.sleep(sleep_time.total_seconds())
                 await send_leaderboard(webhook, COC_CLIENT)
-                last_invoke_day = datetime.date.today()
-            except KeyboardInterrupt:
-                print("Interrupt detected. Closing the process.")
-                running = False
-            except BaseException as e:
+            except BaseException:
                 traceback.print_exc()
     COC_CLIENT.close()
 
 
 if __name__ == '__main__':
-    asyncio.get_event_loop().run_until_complete(main())
+    try:
+        asyncio.get_event_loop().run_until_complete(main())
+    except KeyboardInterrupt:
+        print("Interrupt detected. Closing the process.")
+    except BaseException:
+        traceback.print_exc()
