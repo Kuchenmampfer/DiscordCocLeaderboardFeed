@@ -27,7 +27,7 @@ This script provides the following features:
 - leaderboards including all players in your clan[family]
 - leaderboards including a custom list of players (planned)
 - global/local leaderboards (planned)
-- custom formatting (planned)
+- custom formatting
 - home base leaderboards as well as builder base ones (planned)
 
 
